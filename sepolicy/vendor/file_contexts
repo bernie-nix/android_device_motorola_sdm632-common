@@ -60,3 +60,7 @@
 /(vendor|system/vendor)/bin/init\.oem\.panel\.sh        u:object_r:init-oem-panel-sh_exec:s0
 
 /data/vendor/misc/cutback(/.*)?                         u:object_r:vendor_radio_data_file:s0
+
+# Labels
+/firmware                                                                     u:object_r:firmware_file:s0
+/bt_firmware                                                                  u:object_r:bt_firmware_file:s0
