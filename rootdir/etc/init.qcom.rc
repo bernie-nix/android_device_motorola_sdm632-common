@@ -69,6 +69,14 @@ on early-boot
     write /sys/kernel/boot_slpi/boot 1
     exec u:r:qti_init_shell:s0 -- /vendor/bin/init.qcom.early_boot.sh
 
+    # Mix device-specific information into the entropy pool
+    copy /proc/cmdline /dev/urandom
+    copy /default.prop /dev/urandom
+
+    # RIL permissions fix
+    chmod 0644 /proc/cmdline
+    chown root radio /proc/cmdline
+
     # for backward compatibility
     chown system system /persist/sensors
     chown system system /persist/sensors/registry
