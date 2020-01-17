@@ -26,13 +26,24 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 <manifest version="1.0" type="device">
-     <hal format="hidl">
+    <!-- NFC is declared to be disabled -->
+    <hal override="true">
         <name>android.hardware.nfc</name>
         <transport>hwbinder</transport>
-        <version>1.1</version>
-        <interface>
-            <name>INfc</name>
-            <instance>default</instance>
-        </interface>
+    </hal>
+    <!-- NPX is declared to be disabled -->
+    <hal format="hidl" override="true">
+        <name>vendor.nxp.nxpnfc</name>
+        <transport>hwbinder</transport>
+    </hal>
+    <hal override="true">
+       <name>android.hardware.secure_element</name>
+       <transport>hwbinder</transport>
+       <version>1.0</version>
+       <interface>
+           <name>ISecureElement</name>
+           <instance>SIM1</instance>
+           <instance>SIM2</instance>
+       </interface>
     </hal>
 </manifest>
