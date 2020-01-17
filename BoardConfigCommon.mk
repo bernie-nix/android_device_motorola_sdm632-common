@@ -199,8 +199,16 @@ BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOT_HEADER_VERSION)
 TARGET_PROVIDES_LIBLIGHT := true
 
 # NFC / ODM
-ODM_MANIFEST_SKUS := nfc
-ODM_MANIFEST_NFC_FILES := device/motorola/sdm632-common/odm_manifest_nfc.xml
+ODM_MANIFEST_SKUS += \
+    B \
+    D \
+    DN \
+    N
+
+ODM_MANIFEST_B_FILES := $(PLATFORM_PATH)/nfc/manifest_B.xml   # USA/FI (SINGLE-SIM)  (NFC-NO)
+ODM_MANIFEST_D_FILES := $(PLATFORM_PATH)/nfc/manifest_D.xml   # LA/BR  (DUAL-SIM     (NFC-NO)
+ODM_MANIFEST_DN_FILES := $(PLATFORM_PATH)/nfc/manifest_DN.xml # EU     (DUAL-SIM)    (NFC-YES)
+ODM_MANIFEST_N_FILES := $(PLATFORM_PATH)/nfc/manifest_N.xml   # ??     (SINGLE-SIM   (NFC-YES)
 
 # Partitions
 BOARD_FLASH_BLOCK_SIZE := 131072                  # (BOARD_KERNEL_PAGESIZE * 64)
