@@ -340,12 +340,18 @@ function configure_zram_parameters() {
     # Zram disk - 75% for Go devices.
     # For 512MB Go device, size = 384MB, set same for Non-Go.
     # For 1GB Go device, size = 768MB, set same for Non-Go.
-    # For >1GB and <=3GB Non-Go device, size = 1GB
-    # For >3GB and <=4GB Non-Go device, size = 2GB
-    # For >4GB Non-Go device, size = 4GB
+    # For >=2GB Non-Go devices, size = 50% of RAM size. Limit the size to 4GB.
     # And enable lz4 zram compression for Go targets.
 
-    echo lz4 > /sys/block/zram0/comp_algorithm
+    RamSizeGB=`echo "($MemTotal / 1048576 ) + 1" | bc`
+    zRamSizeBytes=`echo "$RamSizeGB * 1024 * 1024 * 1024 / 2" | bc`
+    if [ $zRamSizeBytes -gt 4294967296 ]; then
+        zRamSizeBytes=4294967296
+    fi
+
+    if [ "$low_ram" == "true" ]; then
+        echo lz4 > /sys/block/zram0/comp_algorithm
+    fi
 
     if [ -f /sys/block/zram0/disksize ]; then
         if [ -f /sys/block/zram0/use_dedup ]; then
@@ -355,12 +361,8 @@ function configure_zram_parameters() {
             echo 402653184 > /sys/block/zram0/disksize
         elif [ $MemTotal -le 1048576 ]; then
             echo 805306368 > /sys/block/zram0/disksize
-        elif [ $MemTotal -le 3145728 ]; then
-            echo 1073741824 > /sys/block/zram0/disksize
-        elif [ $MemTotal -le 4194304 ]; then
-            echo 2147483648 > /sys/block/zram0/disksize
         else
-            echo 4294967296 > /sys/block/zram0/disksize
+            echo $zRamSizeBytes > /sys/block/zram0/disksize
         fi
         mkswap /dev/block/zram0
         swapon /dev/block/zram0 -p 32758
@@ -422,8 +424,10 @@ function enable_swap() {
     fi
 }
 
-function configure_memory_parameters() {
-    # Set Memory parameters.
+# Motorola: We don't use this function.  Renaming it in case  QCOM
+#           adds a new call to it.
+function configure_memory_parameters_DO_NOT_CALL() {
+    # Set Memory paremeters.
     #
     # Set per_process_reclaim tuning parameters
     # All targets will use vmpressure range 50-70,
@@ -485,36 +489,30 @@ else
 
         # Calculate vmpressure_file_min as below & set for 64 bit:
         # vmpressure_file_min = last_lmk_bin + (last_lmk_bin - last_but_one_lmk_bin)
-        minfree_series=`cat /sys/module/lowmemorykiller/parameters/minfree`
-        minfree_1="${minfree_series#*,}" ; rem_minfree_1="${minfree_1%%,*}"
-        minfree_2="${minfree_1#*,}" ; rem_minfree_2="${minfree_2%%,*}"
-        minfree_3="${minfree_2#*,}" ; rem_minfree_3="${minfree_3%%,*}"
-        minfree_4="${minfree_3#*,}" ; rem_minfree_4="${minfree_4%%,*}"
-        minfree_5="${minfree_4#*,}"
-
-        vmpres_file_min=$((minfree_5 + (minfree_5 - rem_minfree_4)))
-        vmpres_file_min_critical=$((vmpres_file_min + (vmpres_file_min - minfree_5)))
-        echo $vmpres_file_min > /sys/module/lowmemorykiller/parameters/vmpressure_file_min
-        echo $vmpres_file_min_critical > /sys/module/lowmemorykiller/parameters/vmpressure_file_min_critical
-
         if [ "$arch_type" == "aarch64" ]; then
-            echo 1048576 > /sys/module/lowmemorykiller/parameters/vmpressure_file_min_critical
+            minfree_series=`cat /sys/module/lowmemorykiller/parameters/minfree`
+            minfree_1="${minfree_series#*,}" ; rem_minfree_1="${minfree_1%%,*}"
+            minfree_2="${minfree_1#*,}" ; rem_minfree_2="${minfree_2%%,*}"
+            minfree_3="${minfree_2#*,}" ; rem_minfree_3="${minfree_3%%,*}"
+            minfree_4="${minfree_3#*,}" ; rem_minfree_4="${minfree_4%%,*}"
+            minfree_5="${minfree_4#*,}"
+
+            vmpres_file_min=$((minfree_5 + (minfree_5 - rem_minfree_4)))
+            echo $vmpres_file_min > /sys/module/lowmemorykiller/parameters/vmpressure_file_min
         else
+            # Set LMK series, vmpressure_file_min for 32 bit non-go targets.
             # Disable Core Control, enable KLMK for non-go 8909.
             if [ "$ProductName" == "msm8909" ]; then
                 disable_core_ctl
                 echo 1 > /sys/module/lowmemorykiller/parameters/enable_lmk
             fi
+        echo "15360,19200,23040,26880,34415,43737" > /sys/module/lowmemorykiller/parameters/minfree
+        echo 53059 > /sys/module/lowmemorykiller/parameters/vmpressure_file_min
         fi
 
         # Enable adaptive LMK for all targets &
         # use Google default LMK series for all 64-bit targets >=2GB.
-        echo 1 > /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk
-
-        # moto add, Disable adaptive LMK for target > 3GB
-        if [ $MemTotal -gt 3145728 ]; then
-            echo 0 > /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk
-        fi
+        #echo 1 > /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk
 
         # Enable oom_reaper
         if [ -f /sys/module/lowmemorykiller/parameters/oom_reaper ]; then
@@ -1928,8 +1926,14 @@ case "$target" in
                 echo 85 > /proc/sys/kernel/sched_upmigrate
                 echo 85 > /proc/sys/kernel/sched_downmigrate
 
+                # Log kernel wake-up source
+                echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
+
                 # Set Memory parameters
                 configure_memory_parameters
+
+                # Set Read ahead values
+                configure_read_ahead_kb_values
             ;;
         esac
         case "$soc_id" in
@@ -2091,9 +2095,6 @@ case "$target" in
             fi
             echo 1 > /sys/module/big_cluster_min_freq_adjust/parameters/min_freq_adjust
 
-            # Log kernel wake-up source
-            echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
-
             ;;
         esac
     ;;
@@ -2143,7 +2144,7 @@ case "$target" in
                 echo 0 > /proc/sys/kernel/sched_boost
 
 		# core_ctl is not needed for 8917. Disable it.
-		echo 1 > /sys/devices/system/cpu/cpu0/core_ctl/disable
+                disable_core_ctl
 
                 for devfreq_gov in /sys/class/devfreq/qcom,mincpubw*/governor
                 do
@@ -2203,8 +2204,12 @@ case "$target" in
                 echo 1 > /sys/module/lpm_levels/lpm_workarounds/dynamic_clock_gating
                 # Enable timer migration to little cluster
                 echo 1 > /proc/sys/kernel/power_aware_timer_migration
+
+                # Log kernel wake-up source
+                echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
+
                 # Set Memory parameters
-                configure_memory_parameters
+                #configure_memory_parameters
                 ;;
                 *)
                 ;;
@@ -2304,8 +2309,12 @@ case "$target" in
                 echo 1 > /sys/module/lpm_levels/lpm_workarounds/dynamic_clock_gating
                 # Enable timer migration to little cluster
                 echo 1 > /proc/sys/kernel/power_aware_timer_migration
+
+                # Log kernel wake-up source
+                echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
+
                 # Set Memory parameters
-                configure_memory_parameters
+                #configure_memory_parameters
             ;;
             *)
 
@@ -3120,7 +3129,8 @@ case "$target" in
 
       # configure governor settings for little cluster
       echo "schedutil" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-      echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/up_rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/down_rate_limit_us
       echo 1209600 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/hispeed_freq
       if [ $sku_identified != 1 ]; then
         echo 576000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
@@ -3128,7 +3138,8 @@ case "$target" in
 
       # configure governor settings for big cluster
       echo "schedutil" > /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
-      echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/up_rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/down_rate_limit_us
       echo 1209600 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/hispeed_freq
       if [ $sku_identified != 1 ]; then
         echo 768000 > /sys/devices/system/cpu/cpu6/cpufreq/scaling_min_freq
@@ -3238,15 +3249,20 @@ case "$target" in
             echo 100 > /proc/sys/kernel/sched_group_upmigrate
             echo 1 > /proc/sys/kernel/sched_walt_rotate_big_tasks
 
+            #colocation v3 settings
+            echo 740000 > /proc/sys/kernel/sched_little_cluster_coloc_fmin_khz
+
             # configure governor settings for little cluster
             echo "schedutil" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-            echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/rate_limit_us
+            echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/up_rate_limit_us
+            echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/down_rate_limit_us
             echo 1248000 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/hispeed_freq
             echo 576000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
 
             # configure governor settings for big cluster
             echo "schedutil" > /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
-            echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/rate_limit_us
+            echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/up_rate_limit_us
+            echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/down_rate_limit_us
             echo 1324600 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/hispeed_freq
             echo 652800 > /sys/devices/system/cpu/cpu6/cpufreq/scaling_min_freq
 
@@ -3664,6 +3680,12 @@ case "$target" in
             echo "mem_latency" > $memlat/governor
             echo 10 > $memlat/polling_interval
             echo 400 > $memlat/mem_latency/ratio_ceil
+        done
+
+        #Enable cdspl3 governor for L3 cdsp nodes
+        for l3cdsp in $device/*cdsp-cdsp-l3-lat/devfreq/*cdsp-cdsp-l3-lat
+        do
+            echo "cdspl3" > $l3cdsp/governor
         done
 
         #Gold L3 ratio ceil
@@ -4120,7 +4142,7 @@ case "$target" in
         echo 80 > /sys/devices/system/cpu/cpu0/cpufreq/interactive/target_loads
         echo 19000 > /sys/devices/system/cpu/cpu0/cpufreq/interactive/min_sample_time
         echo 79000 > /sys/devices/system/cpu/cpu0/cpufreq/interactive/max_freq_hysteresis
-        echo 300000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+        echo 652800 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
         echo 1 > /sys/devices/system/cpu/cpu0/cpufreq/interactive/ignore_hispeed_on_notif
         # online CPU2
         echo 1 > /sys/devices/system/cpu/cpu2/online
@@ -4136,7 +4158,7 @@ case "$target" in
         echo "85 1500000:90 1800000:70 2100000:95" > /sys/devices/system/cpu/cpu2/cpufreq/interactive/target_loads
         echo 19000 > /sys/devices/system/cpu/cpu2/cpufreq/interactive/min_sample_time
         echo 79000 > /sys/devices/system/cpu/cpu2/cpufreq/interactive/max_freq_hysteresis
-        echo 300000 > /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq
+        echo 652800 > /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq
         echo 1 > /sys/devices/system/cpu/cpu2/cpufreq/interactive/ignore_hispeed_on_notif
         # re-enable thermal and BCL hotplug
         echo 1 > /sys/module/msm_thermal/core_control/enabled
@@ -4146,7 +4168,7 @@ case "$target" in
         echo -n enable > /sys/devices/soc/soc:qcom,bcl/mode
         # input boost configuration
         echo "0:1324800 2:1324800" > /sys/module/cpu_boost/parameters/input_boost_freq
-        echo 40 > /sys/module/cpu_boost/parameters/input_boost_ms
+        echo 100 > /sys/module/cpu_boost/parameters/input_boost_ms
         # Setting b.L scheduler parameters
         echo 0 > /proc/sys/kernel/sched_boost
         echo 1 > /proc/sys/kernel/sched_migration_fixup
@@ -4202,11 +4224,12 @@ case "$target" in
 		echo N > /sys/module/lpm_levels/parameters/sleep_disabled
 	fi
 	echo N > /sys/module/lpm_levels/parameters/sleep_disabled
-        # Starting io prefetcher service
-        start iop
+
+	# Log kernel wake-up source
+	echo 1 > /sys/module/msm_show_resume_irq/parameters/debug_mask
 
         # Set Memory parameters
-        configure_memory_parameters
+        #configure_memory_parameters
     ;;
 esac
 
@@ -4553,6 +4576,11 @@ case "$target" in
                     start_hbtp
                     ;;
             esac
+        ;;
+        "HDK" )
+            if [ -d /sys/kernel/hbtpsensor ] ; then
+                start_hbtp
+            fi
         ;;
     esac
 

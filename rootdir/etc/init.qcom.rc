@@ -1,4 +1,4 @@
-# Copyright (c) 2009-2012, 2014-2018, The Linux Foundation. All rights reserved.
+# Copyright (c) 2009-2012, 2014-2019, The Linux Foundation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -40,6 +40,10 @@ on early-init
     chown system graphics /sys/kernel/debug/dri/0/debug/recovery_reg
     chown system graphics /sys/kernel/debug/dri/0/debug/recovery_dbgbus
     chown system graphics /sys/kernel/debug/dri/0/debug/recovery_vbif_dbgbus
+
+    # Change ownership of sw_sync node
+    chown system graphics /sys/kernel/debug/sync/sw_sync
+    chmod 0666 /sys/kernel/debug/sync/sw_sync
 
     chown root system /dev/kmsg
     chmod 0620 /dev/kmsg
@@ -142,9 +146,11 @@ on boot
     mkdir /mnt/vendor/persist/alarm 0770 system system
     mkdir /mnt/vendor/persist/time 0770 system system
     mkdir /mnt/vendor/persist/secnvm 0770 system system
+    mkdir /mnt/vendor/persist/iar_db 0770 system system
+    mkdir /mnt/vendor/spunvm 0770 system system
 
-    #Create NETMGR daemon socket area
-    mkdir /dev/socket/netmgr 0750 radio radio
+    #Create WIGIG socket area
+    mkdir /dev/socket/wigig 0770 wifi wifi
 
     setprop wifi.interface wlan0
 
@@ -161,8 +167,8 @@ on boot
 
 #   Assign TCP buffer thresholds to be ceiling value of technology maximums
 #   Increased technology maximums should be reflected here.
-    write /proc/sys/net/core/rmem_max  16777216
-    write /proc/sys/net/core/wmem_max 16777216
+    write /proc/sys/net/core/rmem_max 134217728
+    write /proc/sys/net/core/wmem_max 134217728
 
     # To prevent out of order acknowledgements from making
     # connection tracking to treat them as not belonging to
@@ -194,6 +200,8 @@ on boot
 
     chown system system /sys/class/backlight/panel0-backlight/brightness
     chown system system /sys/class/backlight/panel0-backlight/max_brightness
+    chown system system /sys/class/backlight/panel1-backlight/brightness
+    chown system system /sys/class/backlight/panel1-backlight/max_brightness
 
     # Allow access to sensors device attributes
     chown system system /sys/class/sensors/MPU6050-accel/enable
@@ -238,8 +246,9 @@ on post-fs-data
     # create QDMA dropbox
     mkdir /data/vendor/qdmastats 0700 system system
     mkdir /data/vendor/qdma 0770 system system
-    mkdir /dev/socket/qdma 0770 system system
-    chmod 2770 /dev/socket/qdma
+    mkdir /dev/socket/qdma 0777 system system
+    chmod 2777 /dev/socket/qdma
+    mkdir /data/vendor/qdma/conf 0770 system system
 
     # Create /data/vendor/tzstorage directory for SFS listener
     mkdir /data/vendor/tzstorage 0770 system system
@@ -249,7 +258,6 @@ on post-fs-data
 
     #Create folder of camera
     mkdir /data/vendor/camera 0770 camera camera
-
 
     #Create directory for tftp
     mkdir /data/vendor/tombstones 0771 system system
@@ -267,23 +275,9 @@ on post-fs-data
     mkdir /data/vendor/wifi/wigig_hostapd 0770 wifi wifi
     mkdir /data/vendor/wifi/wpa 0770 wifi wifi
     mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
-    mkdir /data/misc/dhcp 0750 dhcp system
 
-    #create port-bridge log dir
-    mkdir /data/vendor/port_bridge 0770 radio radio
-    chmod 0770 /data/vendor/port_bridge
-
-    #create netmgr log dir
-    mkdir /data/vendor/netmgr 0770 radio radio
-    chmod 0770 /data/vendor/netmgr
-
-    #create ipacm log dir
-    mkdir /data/vendor/ipa 0770 radio radio
-    chmod 0770 /data/vendor/ipa
-
-    #Create QTI dir for logs
-    mkdir /data/vendor/dataqti 0770 radio radio
-    chmod 0770 /data/vendor/dataqti
+    # Create the directories used by WiGig Sensing
+    mkdir /data/vendor/sensing 0770 system wifi
 
     # Create the directories used by CnE subsystem
     mkdir /data/vendor/connectivity 0771 radio radio
@@ -298,6 +292,7 @@ on post-fs-data
 
     # Create directory for radio
     mkdir /data/vendor/radio 0770 system radio
+    rm /data/vendor/radio/shmbus
 
     # Create directory for modem_config
     mkdir /data/vendor/modem_config 0570 radio root
@@ -319,6 +314,7 @@ on post-fs-data
     chown system system /sys/devices/platform/msm_sdcc.4/polling
 
     #Create the symlink to qcn wpa_supplicant folder for ar6000 wpa_supplicant
+    mkdir /data/system 0775 system system
     #symlink /data/misc/wifi/wpa_supplicant /data/system/wpa_supplicant
 
     #Create directories for Location services
@@ -328,23 +324,17 @@ on post-fs-data
     mkdir /dev/socket/location 0770 gps gps
     mkdir /dev/socket/location/mq 0770 gps gps
     mkdir /dev/socket/location/xtra 0770 gps gps
-    mkdir /data/vendor/location-partner 0770 gps gps
-    mkdir /data/vendor/location-partner/dre 0770 gps gps
-    mkdir /data/vendor/location-partner/ppe 0770 gps gps
-    mkdir /dev/socket/location 0770 gps gps
-    mkdir /dev/socket/location/ehub 0770 gps gps
 
-    # Create directories for wifihal services
+    #Create directories for wifihal services
     mkdir /dev/socket/wifihal 0770 wifi wifi
     chmod 2770 /dev/socket/wifihal
-
-    #Create directory from IMS services
-    mkdir /data/shared 0755
-    chown system system /data/shared
 
     #Create directory for FOTA
     mkdir /data/fota 0771
     chown system system /data/fota
+
+    #Create directory for hostapd
+    mkdir /data/hostapd 0770 system wifi
 
     # Create /data/time folder for time-services
     mkdir /data/vendor/time/ 0700 system system
@@ -362,6 +352,8 @@ on post-fs-data
     mkdir /data/vendor/perfd 0770 root system
     chmod 2770 /data/vendor/perfd
     rm /data/vendor/perfd/default_values
+
+    #mkdir /data/vendor/secure_element 0777 system system
 
     #Create IOP  deamon related dirs
     mkdir /data/vendor/iop 0700 root system
@@ -404,10 +396,21 @@ on post-fs-data
     mkdir /data/vendor/vpp 0770 media media
 
     #Create dir for TUI
-    mkdir /data/vendor/tui 0700 system system
+    mkdir /data/vendor/tui 0700 system drmrpc
 
-    #Start move time data to /data/vendor once post-fs-data done
-    start vendor.move_time_data
+    # NFC vendor data
+    mkdir /data/vendor/nfc 0770 nfc nfc
+
+    # Required by FingerPrint Cards (FPC) via init so we don't need to give qseecomd or fingerprintd permissions to create them
+    mkdir /data/vendor/.fps 0770 system input
+
+    #Create directory for adspd
+    mkdir /data/adspd 0770 audio diag
+
+    mkdir /data/tombstones/modem 0771 system system
+    mkdir /data/tombstones/lpass 0771 system system
+    mkdir /data/tombstones/wcnss 0771 system system
+    mkdir /data/tombstones/dsps 0771 system system
 
 service nqnfcinfo /system/vendor/bin/nqnfcinfo
     class late_start
@@ -528,6 +531,9 @@ on property:vendor.bluetooth.startbtlogger=true
 on property:vendor.bluetooth.startbtlogger=false
     stop vendor.bt_logger
 
+on property:vendor.media.target.version=*
+    setprop vendor.sys.media.target.version ${vendor.media.target.version}
+
 service qcom-c_core-sh  /vendor/bin/init.qcom.class_core.sh
     class core
     user root
@@ -551,16 +557,6 @@ on property:vold.decrypt=trigger_restart_framework
 
 on property:persist.env.fastdorm.enabled=true
     setprop persist.radio.data_no_toggle 1
-
-service vendor.cnd /system/vendor/bin/cnd
-    class main
-    user system
-    group system wifi inet radio wakelock net_admin
-
-service dpmQmiMgr /system/vendor/bin/dpmQmiMgr
-    class main
-    user system
-    group system
 
 service vendor.qrtr-ns /vendor/bin/qrtr-ns -f
     class core
@@ -620,58 +616,21 @@ service vendor.bt_logger /system/bin/bt_logger
 service ftmd /vendor/bin/ftmdaemon
     class late_start
     user root
-    group bluetooth net_bt_admin misc diag net_bt
+    group oem_2901 bluetooth net_bt_admin misc diag net_bt
     disabled
     oneshot
 
-service vendor.port-bridge /system/vendor/bin/port-bridge
-    class main
-    user radio
-    group radio system inet
-    disabled
-    oneshot
+#service qmiproxy /system/bin/qmiproxy
+#    class main
+#    user radio
+#    group radio diag
+#    disabled
 
-service qmiproxy /system/bin/qmiproxy
-    class main
-    user radio
-    group radio diag
-    disabled
-
-# QMUX must be in multiple groups to support external process connections
-service vendor.qmuxd /system/vendor/bin/qmuxd
-    class main
-    user root
-    group radio audio bluetooth gps nfc diag
-    disabled
-
-service vendor.netmgrd /system/vendor/bin/netmgrd
-    class main
-    disabled
-
-service vendor.ipacm-diag /system/vendor/bin/ipacm-diag
-    class main
-    user radio
-    socket ipacm_log_file dgram 660 radio radio
-    group radio diag oem_2901
-    disabled
-
-service vendor.ipacm /system/vendor/bin/ipacm
-    class main
-    user radio
-    group radio inet
-    disabled
-
-service vendor.dataadpl /system/vendor/bin/adpl
-    class main
-    user radio
-    group radio oem_2901 diag usb net_admin
-    disabled
-
-service vendor.sensors /vendor/bin/sscrpcd sensorspd
-    class early_hal
-    user system
-    group system wakelock
-    capabilities BLOCK_SUSPEND
+# service vendor.sensors /vendor/bin/sscrpcd sensorspd
+#    class early_hal
+#    user system
+#    group system wakelock
+#    capabilities BLOCK_SUSPEND
 
 service vendor.sensors.qti /vendor/bin/sensors.qti
     class core
@@ -710,14 +669,14 @@ service vendor.wigig_supplicant /vendor/bin/hw/wpa_supplicant \
     -iwigig0 -Dnl80211 -c/data/vendor/wifi/wigig_supplicant.conf \
     -m/data/vendor/wifi/wigig_p2p_supplicant.conf \
     -O/data/vendor/wifi/wigig_sockets -dd \
-    -e/data/vendor/wifi/wigig_entropy.bin -g@android:wpa_wigig0 \
+    -e/data/vendor/wifi/wigig_entropy.bin -g@android:wigig/wpa_wigig0 \
     -S wigigsvc
     #   we will start as root and wpa_supplicant will switch to user wifi
     #   after setting up the capabilities required for WEXT
     #   user wifi
     #   group wifi inet keystore
     class main
-    socket wpa_wigig0 dgram 660 wifi wifi
+    socket wigig/wpa_wigig0 dgram 660 wifi wifi
     disabled
     oneshot
 
@@ -729,41 +688,23 @@ service vendor.move_wifi_data /system/bin/move_wifi_data.sh
     disabled
     oneshot
 
-# FST Manager with hostapd (softap) - all settings inside ini file
-service fstman /vendor/bin/fstman -B -ddd -c /data/vendor/wifi/fstman.ini -a 1
-    user wifi
-    group wifi
-    capabilities NET_ADMIN NET_RAW
-    class main
-    disabled
-    oneshot
-
-# FST Manager with supplicant - connect to supplicant socket
-service fstman_wlan0 /vendor/bin/fstman -B -ddd -c /data/vendor/wifi/fstman.ini \
-    -a 0 @android:vendor_wpa_wlan0
-    user wifi
-    group wifi
-    capabilities NET_ADMIN NET_RAW
-    class main
-    disabled
-    oneshot
-
-service wigighalsvc /vendor/bin/wigighalsvc
-    interface vendor.qti.hardware.wigig.supptunnel@1.0::ISuppTunnelProvider default
-    class hal
-    user system
-    group wifi
-    # needed for on-demand insmod/rmmod of wigig module
-    capabilities SYS_MODULE
-    disabled
-
 service wigignpt /vendor/bin/wigignpt
     interface vendor.qti.hardware.wigig.netperftuner@1.0::INetPerfTuner default
     class hal
-    socket wigignpt stream 660 system wifi
+    socket wigig/wigignpt stream 660 system wifi
     user system
     group wifi
     capabilities NET_ADMIN
+    disabled
+
+on property:persist.vendor.wigig.npt.enable=1
+    start wigignpt
+
+service vendor.sensingdaemon /vendor/bin/sensingdaemon
+    class hal
+    socket wigig/sensingdaemon stream 660 system wifi
+    user system
+    group wifi
     disabled
 
 service dhcpcd_wlan0 /system/bin/dhcpcd
@@ -826,10 +767,10 @@ service iprenew_wigig0 /system/bin/dhcpcd -n
 #    disabled
 #    oneshot
 
-on property:wifi.ftmd.load=true
+on property:vendor.wifi.ftmd.load=true
     insmod /system/lib/modules/pronto/pronto_wlan.ko con_mode=5
 
-service vendor.wlan_logging /system/vendor/bin/cnss_diag -q -f
+service vendor.wlan_logging /vendor/bin/cnss_diag -q -f
     class main
     user system
     group system wifi inet net_admin sdcard_rw media_rw diag
@@ -867,12 +808,6 @@ service iprenew_bt-pan /system/bin/dhcpcd -n
     disabled
     oneshot
 
-#service ssgqmigd /vendor/bin/ssgqmigd
-#    class late_start
-#    user radio
-#    group radio gps system
-#    socket ssgqmig seqpacket 0660 radio inet
-
 #service ssgtzd /vendor/bin/ssgtzd
 #    class late_start
 #    user system
@@ -899,17 +834,17 @@ on property:crypto.driver.load=1
      insmod /system/lib/modules/qce.ko
      insmod /system/lib/modules/qcedev.ko
 
-service drmdiag /system/vendor/bin/drmdiagapp
-    class late_start
-     user root
-     disabled
-     oneshot
+#service drmdiag /system/vendor/bin/drmdiagapp
+#    class late_start
+#     user root
+#     disabled
+#     oneshot
 
-on property:drmdiag.load=1
-    start drmdiag
+#on property:drmdiag.load=1
+#    start drmdiag
 
-on property:drmdiag.load=0
-    stop drmdiag
+#on property:drmdiag.load=0
+#    stop drmdiag
 
 service qcom-sh /vendor/bin/init.qcom.sh
     class late_start
@@ -969,7 +904,6 @@ service vendor.atfwd /vendor/bin/ATFWD-daemon
     class late_start
     user system
     group system radio
-    disabled
 
 service hostapd_fst /vendor/bin/hw/hostapd -dd -g /data/vendor/wifi/hostapd/global
     interface android.hardware.wifi.hostapd@1.0::IHostapd default
@@ -988,13 +922,13 @@ service vendor.wigig_hostapd /vendor/bin/hw/hostapd -dd  -j wigighostapd /data/v
     oneshot
     disabled
 
-service ims_regmanager /system/vendor/bin/exe-ims-regmanagerprocessnative
-    class late_start
-    group net_bt_admin inet radio wifi
-    disabled
+#service ims_regmanager /system/vendor/bin/exe-ims-regmanagerprocessnative
+#    class late_start
+#    group net_bt_admin inet radio wifi
+#    disabled
 
-on property:persist.ims.regmanager.mode=1
-    start ims_regmanager
+#on property:persist.ims.regmanager.mode=1
+#    start ims_regmanager
 
 on property:ro.data.large_tcp_window_size=true
     # Adjust socket buffer to enlarge TCP receive window for high bandwidth (e.g. DO-RevB)
@@ -1154,17 +1088,6 @@ on property:init.svc.surfaceflinger=restarting
 on property:vendor.display.lcd_density=*
     setprop ro.sf.lcd_density ${vendor.display.lcd_density}
 
-service vendor.vppservice /vendor/bin/vppservice
-    class main
-    user media
-    group camera
-
-service time_daemon /vendor/bin/time_daemon
-    class main
-    user system
-    group system
-    capabilities SYS_TIME
-
 # Set vendor-ril lib path based on Meta version
 on property:vendor.rild.libpath=*
     setprop rild.libpath ${vendor.rild.libpath}
@@ -1183,19 +1106,12 @@ service vendor.power_off_alarm /vendor/bin/power_off_alarm
     disabled
     oneshot
 
-service vendor.move_time_data /system/bin/move_time_data.sh
-    class main
-    user system
-    group system
-    disabled
-    oneshot
-
-#service vendor.hbtp /vendor/bin/hbtp_daemon
-#     class main
-#     user system
-#     group system
-#     capabilities SYS_NICE
-#     disabled
+service vendor.hbtp /vendor/bin/hbtp_daemon
+     class main
+     user system
+     group system
+     capabilities SYS_NICE
+     disabled
 
 service chre /vendor/bin/chre
     class late_start
