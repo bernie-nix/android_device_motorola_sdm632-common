@@ -30,11 +30,13 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <hal override="true">
         <name>android.hardware.nfc</name>
         <transport>hwbinder</transport>
+        <!-- no <version> tag -->
     </hal>
     <!-- NPX is declared to be disabled -->
-    <hal format="hidl" override="true">
+    <hal override="true">
         <name>vendor.nxp.nxpnfc</name>
         <transport>hwbinder</transport>
+        <!-- no <version> tag -->
     </hal>
     <hal override="true">
         <name>android.hardware.radio</name>
@@ -102,6 +104,14 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <name>vendor.qti.hardware.radio.qtiradio</name>
         <transport>hwbinder</transport>
         <version>1.0</version>
+        <interface>
+            <name>IQtiRadio</name>
+            <instance>slot1</instance>
+        </interface>
+    </hal>
+    <hal override="true">
+        <name>vendor.qti.hardware.radio.qtiradio</name>
+        <transport>hwbinder</transport>
         <version>2.1</version>
         <interface>
             <name>IQtiRadio</name>
@@ -129,9 +139,18 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <hal override="true">
         <name>vendor.qti.hardware.data.connection</name>
         <transport>hwbinder</transport>
-        <version>1.0</version>
+        <version>1.1</version>
         <interface>
             <name>IDataConnection</name>
+            <instance>slot1</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>vendor.qti.hardware.data.iwlan</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IIWlan</name>
             <instance>slot1</instance>
         </interface>
     </hal>

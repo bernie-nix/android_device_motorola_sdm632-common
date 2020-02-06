@@ -65,6 +65,8 @@ static int profile_high_performance[] = {
     MIN_FREQ_LITTLE_CORE_0, 0xFFF,
     GPU_MIN_POWER_LEVEL, 0x1,
     SCHED_PREFER_IDLE_DIS_V3, 0x1,
+    SCHED_MOSTLY_IDLE_NR_RUN, 0x1,
+    SCHED_MOSTLY_IDLE_LOAD, 0x1,
 };
 
 static int profile_power_save[] = {
@@ -259,13 +261,13 @@ static int process_video_encode_hint(void *metadata)
     }
 
     if (video_encode_metadata.state == 1) {
-        if (is_interactive_governor(governor) || is_schedutil_governor(governor)) {
+        if (is_interactive_governor(governor)) {
             video_encode_handle = perf_hint_enable(
                     VIDEO_ENCODE_HINT, 0);
             return HINT_HANDLED;
         }
     } else if (video_encode_metadata.state == 0) {
-        if (is_interactive_governor(governor) || is_schedutil_governor(governor)) {
+        if (is_interactive_governor(governor)) {
             release_request(video_encode_handle);
             return HINT_HANDLED;
         }
@@ -327,11 +329,7 @@ static int process_interaction_hint(void *data)
     s_previous_boost_timespec = cur_boost_timespec;
     s_previous_duration = duration;
 
-    if (duration > kMinInteractiveDuration) {
-        perf_hint_enable_with_type(VENDOR_HINT_SCROLL_BOOST, duration, SCROLL_VERTICAL);
-    }else {
-        perf_hint_enable_with_type(VENDOR_HINT_SCROLL_BOOST, duration, SCROLL_PREFILING);
-    }
+    perf_hint_enable_with_type(VENDOR_HINT_SCROLL_BOOST, duration, SCROLL_VERTICAL);
 
     return HINT_HANDLED;
 }
@@ -376,7 +374,35 @@ int power_hint_override(power_hint_t hint, void *data)
     return ret_val;
 }
 
-int set_interactive_override(__attribute__((unused)) int on)
+int set_interactive_override(int on)
 {
-    return HINT_HANDLED; /* Don't excecute this code path, not in use */
+    char governor[80];
+
+    if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU0) == -1) {
+        if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU1) == -1) {
+            if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU2) == -1) {
+                if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU3) == -1) {
+                    ALOGE("Can't obtain scaling governor.");
+                    return HINT_NONE;
+                }
+            }
+        }
+    }
+
+    if (!on) {
+        /* Display off. */
+        if (is_interactive_governor(governor)) {
+            int resource_values[] = {
+                INT_OP_CLUSTER0_TIMER_RATE, BIG_LITTLE_TR_MS_40
+            };
+            perform_hint_action(DISPLAY_STATE_HINT_ID,
+                    resource_values, ARRAY_SIZE(resource_values));
+        }
+    } else {
+        /* Display on. */
+        if (is_interactive_governor(governor)) {
+            undo_hint_action(DISPLAY_STATE_HINT_ID);
+        }
+    }
+    return HINT_HANDLED;
 }

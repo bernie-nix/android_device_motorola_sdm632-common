@@ -376,7 +376,7 @@ case "$target" in
                 fi
 
                 if [ $cap_ver -eq 1 ]; then
-                    setprop vendor.media.target.version 1
+                    setprop vendor.media.msm8953.version 1
                 fi
                 ;;
     #Set property to differentiate SDM660 & SDM455
@@ -384,7 +384,7 @@ case "$target" in
     "sdm660")
         case "$soc_hwid" in
            385)
-               setprop vendor.media.target.version 1
+               setprop vendor.media.sdm660.version 1
         esac
         ;;
 esac
