@@ -346,7 +346,7 @@ case "$target" in
                 else
                     setprop vendor.rild.libpath "/vendor/lib64/libril-qc-hal-qmi.so"
                 fi
-                ;;
+        ;;
             "zygote32")
                 if [ "$modem" \< "3.0" ]; then
                     setprop vendor.rild.libpath "/vendor/lib/libril-qc-qmi-1.so"
@@ -376,7 +376,7 @@ case "$target" in
                 fi
 
                 if [ $cap_ver -eq 1 ]; then
-                    setprop vendor.media.msm8953.version 1
+                    setprop vendor.media.target.version 1
                 fi
                 ;;
     #Set property to differentiate SDM660 & SDM455
@@ -384,7 +384,7 @@ case "$target" in
     "sdm660")
         case "$soc_hwid" in
            385)
-               setprop vendor.media.sdm660.version 1
+               setprop vendor.media.target.version 1
         esac
         ;;
 esac
@@ -421,23 +421,6 @@ case "$product" in
 esac
 case "$product" in
         "sm6150_au")
-         setprop vendor.display.lcd_density 160
-         ;;
-        *)
-        ;;
-esac
-case "$product" in
-        "sdmshrike_au")
-         setprop vendor.display.lcd_density 160
-         echo 940800000 > /sys/class/devfreq/soc:qcom,cpu0-cpu-l3-lat/min_freq
-         echo 940800000 > /sys/class/devfreq/soc:qcom,cpu4-cpu-l3-lat/min_freq
-         ;;
-        *)
-        ;;
-esac
-
-case "$product" in
-        "msmnile_gvmq")
          setprop vendor.display.lcd_density 160
          ;;
         *)
